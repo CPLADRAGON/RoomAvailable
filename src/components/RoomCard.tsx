@@ -90,7 +90,7 @@ export default function RoomCard({
               {venue}
             </div>
             {metaBits.length > 0 && (
-              <div className="mt-1.5 truncate text-[12.5px] text-zinc-500">
+              <div className="mt-1.5 text-[12.5px] text-zinc-500 max-sm:truncate">
                 {metaBits.join(" · ")}
               </div>
             )}
