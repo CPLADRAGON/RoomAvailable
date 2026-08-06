@@ -71,8 +71,9 @@ export default function RoomCard({
               <span className="text-[11px] text-zinc-400">~{entry.capacity} seats</span>
             ) : null}
             {distM != null && (
-              <span className="text-[11px] font-medium text-zinc-500">
-                · {formatDistance(distM)} · ~{walkMinutes(distM)} min
+              <span className="text-[11px] font-medium text-zinc-500 sm:w-full">
+                <span className="sm:hidden">· </span>
+                {formatDistance(distM)} · ~{walkMinutes(distM)} min
               </span>
             )}
           </div>
