@@ -668,6 +668,7 @@ export default function Home() {
           venue={detailVenue[0]}
           entry={detailVenue[1]}
           now={now}
+          effectiveNow={effectiveNow}
           semester={semester}
           lastUpdated={lastUpdated}
           isFavorite={isFavorite(detailVenue[0])}

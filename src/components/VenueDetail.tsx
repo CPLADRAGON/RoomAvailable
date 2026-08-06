@@ -39,6 +39,11 @@ interface Props {
   entry: VenueEntry;
   now: Date;
   semester: CalendarEntry | null;
+  // Plan-ahead "Free at" time, when set. Availability + the timetable's "now"
+  // line are computed against this so the detail matches the card grid; the
+  // relative "X ago" timestamps below keep using the real clock (`now`) since
+  // data-updated/report times are wall-clock facts.
+  effectiveNow?: Date;
   lastUpdated: number | null;
   isFavorite?: boolean;
   onToggleFavorite?: (venue: string) => void;
@@ -50,14 +55,16 @@ export default function VenueDetail({
   entry,
   now,
   semester,
+  effectiveNow,
   lastUpdated,
   isFavorite,
   onToggleFavorite,
   onClose,
 }: Props) {
+  const effective = effectiveNow ?? now;
   const occupancy = useMemo(
-    () => computeOccupancy(entry, now, semester),
-    [entry, now, semester]
+    () => computeOccupancy(entry, effective, semester),
+    [entry, effective, semester]
   );
   const [showMap, setShowMap] = useState(false);
   const [reports, setReports] = useState<Report[] | null>(null);
@@ -409,7 +416,7 @@ export default function VenueDetail({
           free. Tap a class for details.
         </p>
 
-        <WeekGrid entry={entry} now={now} semester={semester} />
+        <WeekGrid entry={entry} now={effective} semester={semester} />
       </div>
     </div>
   );
