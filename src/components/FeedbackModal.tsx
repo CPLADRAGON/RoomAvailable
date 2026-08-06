@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useModalA11y } from "@/hooks/useModalA11y";
 
 const ENDPOINT = process.env.NEXT_PUBLIC_FEEDBACK_ENDPOINT;
 const FALLBACK_EMAIL = process.env.NEXT_PUBLIC_FEEDBACK_EMAIL;
@@ -14,6 +15,7 @@ export default function FeedbackModal({ onClose }: { onClose: () => void }) {
   const [errorMsg, setErrorMsg] = useState("");
 
   const canSubmit = message.trim().length > 0 && status !== "submitting";
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose);
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -57,7 +59,12 @@ export default function FeedbackModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="glass w-full max-w-md rounded-t-2xl p-5 sm:rounded-2xl"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Send feedback"
+        tabIndex={-1}
+        className="glass w-full max-w-md rounded-t-2xl p-5 outline-none sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-start justify-between">

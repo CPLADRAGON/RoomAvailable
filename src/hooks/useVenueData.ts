@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { VenueMatrix, VenueEntry } from "@/types";
-import { fetchVenueData } from "@/lib/nusmods";
+import { fetchVenueData, fetchCompactedSnapshot } from "@/lib/nusmods";
+import { inferCluster } from "@/lib/cluster-rules";
 import { readCache, writeCache, isStale } from "@/lib/venue-cache";
 
 interface VenueDataState {
@@ -39,12 +40,27 @@ export function useVenueData() {
     []
   );
 
-  // Fetch fresh data from NUSMods, persist, and update state.
+  // Fetch fresh data, persist, and update state. Tries our own compacted,
+  // edge-cached snapshot first (Tier 0); falls back to a direct NUSMods+
+  // GitHub fetch (Tier 1, the original behavior) if that's unavailable; and
+  // finally to the bundled offline snapshot (Tier 2) if both fail and there
+  // is no existing cache to fall back on.
   const revalidate = useCallback(
     async (hadCache: boolean) => {
       if (mounted.current) {
         setState((s) => ({ ...s, refreshing: true }));
       }
+
+      // Tier 0: our own compacted, edge-cached snapshot.
+      try {
+        const fresh = await fetchCompactedSnapshot();
+        await writeCache(fresh);
+        applyMatrix(fresh, Date.now(), false);
+        return;
+      } catch {
+        /* fall through to Tier 1 */
+      }
+
       try {
         const fresh = await fetchVenueData();
         await writeCache(fresh);
@@ -101,7 +117,15 @@ function fromMatrix(data: VenueMatrix) {
   const venues: [string, VenueEntry][] = [];
   for (const [key, val] of Object.entries(data)) {
     if (key.startsWith("_")) continue;
-    venues.push([key, val as VenueEntry]);
+    const entry = val as VenueEntry;
+    // Always derive the cluster from the venue code on the client rather than
+    // trusting the baked `cluster` field. This keeps filtering + near-me
+    // ranking correct even when the served snapshot (Vercel Blob, the 12h
+    // IndexedDB cache, or the bundled offline file) predates a cluster-rule
+    // change — e.g. the Science ("S1"–"S17") mapping. inferCluster is a pure,
+    // cheap function of the code, so future cluster tweaks need no re-bake.
+    const cluster = inferCluster(key);
+    venues.push([key, cluster === entry.cluster ? entry : { ...entry, cluster }]);
   }
   return { data, venues, loading: false, error: null };
 }

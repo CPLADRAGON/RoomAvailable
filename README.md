@@ -1,9 +1,30 @@
 <div align="center">
   <img src="public/icon.svg" alt="NUS Vacansee" width="96" />
   <h1>NUS Vacansee</h1>
-  <p><em>See what's free, now.</em></p>
+  <p><em>Find your free room nearby.</em></p>
   <p>Find available rooms on the NUS campus in real time — ranked by how near they are to you.</p>
+
+  <a href="https://nus-vacansee.vercel.app/"><strong>nus-vacansee.vercel.app →</strong></a>
+
+  <br/><br/>
+
+  [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+  ![No backend](https://img.shields.io/badge/architecture-no%20backend-brightgreen)
+  ![PWA](https://img.shields.io/badge/install-PWA-blue)
+  ![Made for NUS](https://img.shields.io/badge/made%20for-NUS%20students-orange)
 </div>
+
+<br/>
+
+<p align="center">
+  <img src="docs/screenshots/demo.gif" alt="NUS Vacansee demo" width="230" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/list-view.png" alt="List view — free rooms near you" width="230" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/map-view.png" alt="Map view — room pins on campus" width="230" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/timetable-view.png" alt="Timetable — weekly schedule per venue" width="230" />
+</p>
 
 ---
 
@@ -21,20 +42,16 @@ it is, roughly how many seats, and one-tap directions.
 
 ## Features
 
-- 📍 **Available now, near you** — auto-detects your location and lists currently
-  vacant rooms ranked by distance + how long they stay free.
-- 🟢 **Live status** — vacant / occupied / busy, computed from the local clock,
-  refreshed every 30s.
-- 🗺️ **Map view** — free-room pins on a OneMap basemap with NUS building names;
-  tap a pin for details and directions.
-- 🧭 **Directions** — opens the room's exact location in Google Maps.
-- 🗓️ **Weekly timetable** — a NUSMods-style grid per venue with a "now" line.
-- 🔎 **Filters & search** — faculty cluster, room type (lecture theatre / tutorial
-  / lab / seminar / classroom), free-for ≥ 1h/2h/3h, "All venues", and fuzzy
-  venue search.
-- ⭐ **Favorites & recents** — save go-to rooms for one-tap access.
-- 📱 **Installable PWA** — works offline with a cached snapshot; add to your home
-  screen on iOS/Android.
+| Feature | Description |
+|---|---|
+| **Available now, near you** | Auto-detects your location and lists currently vacant rooms ranked by distance + how long they stay free |
+| **Live status** | Vacant / occupied / busy, computed from the local clock, refreshed every 30 s |
+| **Map view** | Free-room pins on a OneMap basemap with NUS building names; tap a pin for details and directions |
+| **Directions** | Opens the room's exact location in Google Maps |
+| **Weekly timetable** | A NUSMods-style grid per venue with a "now" line |
+| **Filters & search** | Faculty cluster, room type (lecture theatre / tutorial / lab / seminar / classroom), free-for ≥ 1 h/2 h/3 h, and fuzzy venue search |
+| **Favorites & recents** | Save go-to rooms for one-tap access |
+| **Installable PWA** | Works offline with a cached snapshot; add to your home screen on iOS / Android |
 
 ## How it works
 
@@ -100,10 +117,14 @@ Room availability and venue locations come from [NUSMods](https://nusmods.com):
 - **Availability:** `https://api.nusmods.com/v2/{acadYear}/semesters/{sem}/venueInformation.json`
 - **Locations / room names / floors:** `venues.json` from the
   [`nusmodifications/nusmods`](https://github.com/nusmodifications/nusmods) repo
+- **Academic calendar:** the semester / teaching-week / recess-reading-exam logic
+  in `src/lib/calendar.ts` is **ported from NUSMods'
+  [`nusmoderator`](https://github.com/nusmodifications/nusmods/tree/master/packages/nusmoderator)
+  package** (MIT), so week numbering matches NUSMods exactly.
 
 NUSMods provides a public API and asks that it be used responsibly — this app
 fetches at most once per ~12h, caches client-side, and ships a static fallback.
-NUSMods is distributed under the MIT License:
+NUSMods and its `nusmoderator` package are distributed under the MIT License:
 
 ```
 The MIT License (MIT)
@@ -149,3 +170,16 @@ before relying on it.
 ## License
 
 [MIT](LICENSE) © NUS Vacansee contributors.
+
+## Contributing
+
+Contributions are welcome! Whether it's a bug report, feature request, or pull request — we appreciate it.
+
+1. Fork the repo
+2. Create your feature branch (`git checkout -b feature/cool-feature`)
+3. Commit your changes
+4. Push to the branch and open a Pull Request
+
+## Star this repo
+
+If Vacansee helped you find a study spot, please consider giving it a star — it helps other NUS students discover it!

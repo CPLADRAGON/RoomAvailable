@@ -7,6 +7,7 @@ export const CLUSTERS: ClusterInfo[] = [
   { id: "UTown", label: "UTown", lat: 1.304, lng: 103.774 },
   { id: "Business", label: "BIZ Business", lat: 1.2938, lng: 103.7752 },
   { id: "Design & Environment", label: "SDE Design & Env", lat: 1.2965, lng: 103.77 },
+  { id: "Science", label: "SCI Science", lat: 1.2966, lng: 103.7809 },
   { id: "Medicine", label: "Medicine", lat: 1.2887, lng: 103.7829 },
   { id: "Law", label: "Law", lat: 1.294, lng: 103.779 },
   { id: "Music", label: "Music", lat: 1.2953, lng: 103.78 },

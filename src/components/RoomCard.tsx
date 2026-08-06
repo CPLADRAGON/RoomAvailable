@@ -17,12 +17,6 @@ interface Props {
   onSelect: (venue: string, entry: VenueEntry) => void;
 }
 
-const ACCENT: Record<string, string> = {
-  vacant: "before:bg-status-vacant",
-  occupied: "before:bg-status-occupied",
-  crunch: "before:bg-status-crunch",
-};
-
 export default function RoomCard({
   venue,
   entry,
@@ -45,68 +39,108 @@ export default function RoomCard({
       ? haversineMeters(userLoc.lat, userLoc.lng, entry.lat, entry.lng)
       : null;
 
+  // Signature "availability meter": visualize how long the room stays free.
+  // Fill is relative to an 8h reference so a whole-evening vacancy reads full
+  // and a soon-ending gap reads short. Occupied rooms show an empty track.
+  const REF_MIN = 480;
+  const freeBlock =
+    occupancy.status === "vacant"
+      ? occupancy.freeMinutes ?? 0
+      : occupancy.freeForMinutes ?? 0;
+  const meterPct =
+    isOccupied && !occupancy.freeAt
+      ? 0
+      : Math.max(4, Math.min(100, Math.round((freeBlock / REF_MIN) * 100)));
+  const meterWarn =
+    occupancy.status === "crunch" ||
+    (occupancy.status === "vacant" && (occupancy.freeMinutes ?? 0) < 60);
+
+  const metaBits = [
+    entry.type,
+    entry.capacity ? `~${entry.capacity} seats` : null,
+    distM != null ? `${formatDistance(distM)} · ~${walkMinutes(distM)} min` : null,
+  ].filter(Boolean);
+
+  let freeLabel = "";
+  let freeValue = "";
+  let untilText = "";
+  if (occupancy.status === "vacant") {
+    freeLabel = "Free for";
+    freeValue = occupancy.freeMinutes != null ? formatDuration(occupancy.freeMinutes) : "—";
+    untilText = occupancy.nextClass
+      ? `until ${formatTime(occupancy.nextClass.start)}`
+      : occupancy.hasScheduleToday === false
+        ? "no class today"
+        : "rest of day";
+  } else {
+    freeLabel = occupancy.freeAt ? "Free at" : "";
+    freeValue = occupancy.freeAt ? formatTime(occupancy.freeAt) : "Booked rest of day";
+    untilText = occupancy.until ? `class ends ${formatTime(occupancy.until)}` : "";
+  }
+
   return (
     <div className="relative">
       <button
         onClick={() => onSelect(venue, entry)}
-        className={`glass relative w-full overflow-hidden p-4 text-left transition-transform duration-200 hover:scale-[1.02] hover:shadow-md cursor-pointer before:absolute before:inset-y-0 before:left-0 before:w-1 ${ACCENT[occupancy.status]}`}
+        className="glass relative w-full overflow-hidden p-5 text-left cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nus-blue/40 dark:hover:border-white/20"
       >
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <span className="font-mono text-xl font-bold tracking-tight text-nus-blue">
-            {venue}
-          </span>
-          <span className="mr-7 whitespace-nowrap rounded bg-zinc-100 px-2 py-0.5 font-mono text-xs text-zinc-500">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="font-mono text-[22px] font-semibold leading-none tracking-[-0.02em] text-zinc-800">
+              {venue}
+            </div>
+            {metaBits.length > 0 && (
+              <div className="mt-1.5 truncate text-[12.5px] text-zinc-500">
+                {metaBits.join(" · ")}
+              </div>
+            )}
+          </div>
+          <span className="mr-6 shrink-0 whitespace-nowrap font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-zinc-400">
             {entry.cluster}
           </span>
         </div>
 
-        {(entry.type || entry.capacity || distM != null) && (
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            {entry.type && (
-              <span className="rounded-full bg-nus-blue/10 px-2 py-0.5 text-[11px] font-medium text-nus-blue">
-                {entry.type}
-              </span>
-            )}
-            {entry.capacity ? (
-              <span className="text-[11px] text-zinc-400">~{entry.capacity} seats</span>
-            ) : null}
-            {distM != null && (
-              <span className="text-[11px] font-medium text-zinc-500 sm:w-full">
-                <span className="sm:hidden">· </span>
-                {formatDistance(distM)} · ~{walkMinutes(distM)} min
-              </span>
-            )}
-          </div>
-        )}
-
-        <div className="mb-2">
+        <div className="mt-4 mb-2.5 flex items-center gap-2">
           <StatusBadge info={occupancy} />
+          {occupancy.status === "vacant" && occupancy.nextClass && (
+            <span className="ml-auto shrink-0 font-mono text-[11px] text-zinc-400">
+              next {formatTime(occupancy.nextClass.start)}
+            </span>
+          )}
+          {occupancy.status === "vacant" && occupancy.hasScheduleToday === false && (
+            <span className="ml-auto shrink-0 font-mono text-[11px] text-zinc-400">
+              no class today
+            </span>
+          )}
+          {isOccupied && occupancy.currentModule && (
+            <span className="ml-auto min-w-0 truncate font-mono text-[11px] text-zinc-400">
+              {occupancy.currentModule}
+            </span>
+          )}
         </div>
 
-        {isOccupied && (
-          <p className="text-sm text-zinc-700">
-            <span className="font-medium">{occupancy.currentModule}</span>
-            {occupancy.until && (
-              <span className="text-zinc-400"> · ends {formatTime(occupancy.until)}</span>
-            )}
-          </p>
-        )}
+        {/* Availability meter */}
+        <div className="relative h-[5px] w-full overflow-hidden rounded-full bg-zinc-100">
+          <span
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{
+              width: `${meterPct}%`,
+              background: meterWarn
+                ? "linear-gradient(90deg,#f0b429,#d98a00)"
+                : "linear-gradient(90deg,#12b981,#0e9f6e)",
+            }}
+          />
+        </div>
 
-        {occupancy.status === "vacant" && occupancy.freeMinutes != null && (
-          <p className="text-sm text-emerald-700">
-            Free for{" "}
-            <span className="font-semibold">
-              {formatDuration(occupancy.freeMinutes)}
-            </span>
-            {occupancy.nextClass && (
-              <span className="text-zinc-400">
-                {" "}
-                · next {occupancy.nextClass.module} at{" "}
-                {formatTime(occupancy.nextClass.start)}
-              </span>
-            )}
-          </p>
-        )}
+        <div className="mt-2.5 flex items-baseline justify-between gap-2">
+          <span className="text-[13px] text-zinc-500">
+            {freeLabel && `${freeLabel} `}
+            <b className="font-mono font-semibold text-zinc-800">{freeValue}</b>
+          </span>
+          {untilText && (
+            <span className="shrink-0 font-mono text-[11px] text-zinc-400">{untilText}</span>
+          )}
+        </div>
       </button>
 
       {onToggleFavorite && (

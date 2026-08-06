@@ -10,7 +10,7 @@ interface Props {
   userLoc: { lat: number; lng: number } | null;
   isFavorite?: (venue: string) => boolean;
   onToggleFavorite?: (venue: string) => void;
-  emptyMessage?: string;
+  emptyMessage?: React.ReactNode;
   onVenueSelect: (venue: string, entry: VenueEntry) => void;
 }
 
@@ -35,7 +35,7 @@ export default function RoomGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {venues.map(([code, entry]) => (
         <RoomCard
           key={code}

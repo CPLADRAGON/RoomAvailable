@@ -3,13 +3,10 @@
 import type { OccupancyInfo } from "@/types";
 import { formatTime } from "@/lib/occupancy-engine";
 
-const STYLES: Record<string, string> = {
-  vacant:
-    "bg-emerald-50 text-emerald-700 border-emerald-200",
-  occupied:
-    "bg-red-50 text-red-700 border-red-200",
-  crunch:
-    "bg-amber-50 text-amber-700 border-amber-200",
+const TEXT: Record<string, string> = {
+  vacant: "text-emerald-600",
+  occupied: "text-red-500",
+  crunch: "text-amber-600",
 };
 
 const DOTS: Record<string, string> = {
@@ -18,9 +15,16 @@ const DOTS: Record<string, string> = {
   crunch: "bg-status-crunch",
 };
 
+const RING: Record<string, string> = {
+  vacant: "shadow-[0_0_0_3px_rgba(16,185,129,0.16)]",
+  occupied: "shadow-[0_0_0_3px_rgba(239,68,68,0.16)]",
+  crunch: "shadow-[0_0_0_3px_rgba(245,158,11,0.16)]",
+};
+
 export default function StatusBadge({ info }: { info: OccupancyInfo }) {
-  const style = STYLES[info.status];
+  const text = TEXT[info.status];
   const dot = DOTS[info.status];
+  const ring = RING[info.status];
 
   let label: string;
   if (info.status === "vacant" && info.nextClass) {
@@ -30,15 +34,15 @@ export default function StatusBadge({ info }: { info: OccupancyInfo }) {
   } else if (info.status === "crunch") {
     label = "CRUNCH HOUR";
   } else {
-    label = `OCCUPIED (${info.currentModule ?? ""})`;
+    label = "OCCUPIED";
   }
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs font-medium ${style}`}
-    >
-      <span className={`h-2 w-2 rounded-full ${dot}`} />
-      {label}
+    <span className="inline-flex items-center gap-2">
+      <span className={`h-[7px] w-[7px] shrink-0 rounded-full ${dot} ${ring}`} />
+      <span className={`text-[11px] font-bold uppercase tracking-[0.14em] ${text}`}>
+        {label}
+      </span>
     </span>
   );
 }

@@ -1,7 +1,7 @@
 {
   "name": "NUS Vacansee",
   "short_name": "Vacansee",
-  "description": "See what's free, now — find available rooms on NUS campus in real time.",
+  "description": "Find your free room nearby — real-time room availability on NUS campus.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F4F6F9",

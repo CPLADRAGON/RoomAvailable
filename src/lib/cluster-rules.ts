@@ -35,6 +35,10 @@ export function inferCluster(venue: string): string {
   for (const [prefix, cluster] of CLUSTER_RULES) {
     if (v.startsWith(prefix)) return cluster;
   }
+  // Science buildings (S1–S17, S1A, S2, S4, S5, S8, S11–S14, S16, S17 …) all
+  // share an "S + digit" pattern. Checked after the explicit prefixes so
+  // Design & Environment (SDE…) and other non-digit "S" codes are unaffected.
+  if (/^S\d/.test(v)) return "Science";
   return "Other";
 }
 

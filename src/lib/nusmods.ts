@@ -11,10 +11,20 @@ const API_BASE = "https://api.nusmods.com/v2";
 const VENUE_LOCATIONS_URL =
   "https://raw.githubusercontent.com/nusmodifications/nusmods/master/website/src/data/venues.json";
 
+// Identify this app on outbound requests to NUSMods/GitHub as a courtesy to the
+// API maintainers (responsible-use etiquette). Only takes effect server-side
+// (in the daily cron); browsers treat User-Agent as a forbidden header and
+// silently ignore it, so the Tier-1 client fallback is unaffected.
+const REQUEST_HEADERS = {
+  "User-Agent":
+    "NUS-Vacansee/1.0 (+https://github.com/CPLADRAGON/nus-vacansee; independent student project)",
+};
+
 // --- Raw NUSMods venueInformation.json shapes ------------------------------
 
 type RawWeeks =
   | number[]
+  | { start: string; end: string }
   | { start: string; end: string; weeks: number[] }
   | { start: string; end: string; weekInterval: number };
 
@@ -82,6 +92,51 @@ function normalizeWeeks(weeks: RawWeeks | undefined, semStartISO: string): numbe
   return [];
 }
 
+function isoDate(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+// Resolve special-term schedules into explicit occurrence dates (ISO). Special
+// terms have no global teaching-week numbering, so classes are matched by the
+// actual calendar dates they run. `start` is the first occurrence (already on
+// the class's weekday); stepping by 7 days preserves the weekday.
+function scheduleToDates(weeks: RawWeeks | undefined): string[] {
+  if (!weeks || Array.isArray(weeks)) return [];
+  if (!weeks.start || !weeks.end) return [];
+  const base = new Date(weeks.start).getTime();
+  const end = new Date(weeks.end).getTime();
+  const WEEK = 7 * 86400000;
+
+  if ("weeks" in weeks && Array.isArray(weeks.weeks)) {
+    return [
+      ...new Set(
+        weeks.weeks
+          .filter((w) => typeof w === "number")
+          .map((w) => isoDate(base + (w - 1) * WEEK))
+      ),
+    ].sort();
+  }
+
+  const step =
+    "weekInterval" in weeks ? Math.max(1, weeks.weekInterval || 1) * WEEK : WEEK;
+  const out: string[] = [];
+  for (let cursor = base; cursor <= end; cursor += step) out.push(isoDate(cursor));
+  return [...new Set(out)].sort();
+}
+
+// Semesters 1 & 2 use academic teaching weeks (unchanged). Special terms (3 & 4)
+// use explicit occurrence dates.
+function normalizeSchedule(
+  weeks: RawWeeks | undefined,
+  semester: number,
+  semStartISO: string
+): { weeks: number[]; dates: string[] } {
+  if (semester === 3 || semester === 4) {
+    return { weeks: [], dates: scheduleToDates(weeks) };
+  }
+  return { weeks: normalizeWeeks(weeks, semStartISO), dates: [] };
+}
+
 interface VenueMeta {
   lessonTypes: string[];
   maxSize: number;
@@ -106,8 +161,9 @@ function normalizeSemester(
         const start = (cls.startTime || "").trim();
         const end = (cls.endTime || "").trim();
         const moduleCode = (cls.moduleCode || "").trim();
-        const weeks = normalizeWeeks(cls.weeks, semStartISO);
-        if (!start || !end || !moduleCode || weeks.length === 0) continue;
+        const { weeks, dates } = normalizeSchedule(cls.weeks, semester, semStartISO);
+        if (!start || !end || !moduleCode) continue;
+        if (weeks.length === 0 && dates.length === 0) continue;
 
         const slot: TimetableSlot = {
           start,
@@ -116,6 +172,11 @@ function normalizeSemester(
           semester,
           weeks,
         };
+        if (dates.length > 0) slot.dates = dates;
+        const lessonType = (cls.lessonType || "").trim();
+        const classNo = (cls.classNo || "").trim();
+        if (lessonType) slot.lessonType = lessonType;
+        if (classNo) slot.classNo = classNo;
 
         let entry = out[venue];
         if (!entry) {
@@ -146,7 +207,7 @@ async function fetchSemester(
   semester: number
 ): Promise<RawVenueInfo> {
   const url = `${API_BASE}/${acadYear}/semesters/${semester}/venueInformation.json`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, { cache: "no-store", headers: REQUEST_HEADERS });
   if (!res.ok) throw new Error(`NUSMods HTTP ${res.status} (sem ${semester})`);
   return (await res.json()) as RawVenueInfo;
 }
@@ -168,7 +229,7 @@ interface VenueLocation {
 async function fetchVenueLocations(): Promise<Record<string, VenueLocation>> {
   const out: Record<string, VenueLocation> = {};
   try {
-    const res = await fetch(VENUE_LOCATIONS_URL);
+    const res = await fetch(VENUE_LOCATIONS_URL, { headers: REQUEST_HEADERS });
     if (!res.ok) return out;
     const raw = (await res.json()) as Record<string, RawVenueLocation>;
     for (const [code, v] of Object.entries(raw)) {
@@ -197,9 +258,11 @@ export async function fetchVenueData(
   const calendar: CalendarMap = buildCalendar(acadStart);
   const sems = calendar[acadYear];
 
-  const [raw1, raw2, locations] = await Promise.all([
+  const [raw1, raw2, raw3, raw4, locations] = await Promise.all([
     fetchSemester(acadYear, 1).catch(() => ({}) as RawVenueInfo),
     fetchSemester(acadYear, 2).catch(() => ({}) as RawVenueInfo),
+    fetchSemester(acadYear, 3).catch(() => ({}) as RawVenueInfo), // Special Term I
+    fetchSemester(acadYear, 4).catch(() => ({}) as RawVenueInfo), // Special Term II
     fetchVenueLocations(),
   ]);
 
@@ -214,6 +277,8 @@ export async function fetchVenueData(
   const meta: Record<string, VenueMeta> = {};
   normalizeSemester(raw1, 1, sems["1"].start, venues, meta);
   normalizeSemester(raw2, 2, sems["2"].start, venues, meta);
+  normalizeSemester(raw3, 3, "", venues, meta); // date-based; no semStart needed
+  normalizeSemester(raw4, 4, "", venues, meta);
 
   // Sort each day's slots by start time for deterministic display.
   for (const entry of Object.values(venues)) {
@@ -253,3 +318,15 @@ export async function fetchVenueData(
   Object.assign(matrix, venues);
   return matrix;
 }
+
+// Fetch the compacted snapshot our own daily cron maintains (see
+// src/app/api/venues/route.ts and src/app/api/cron/refresh-venues/route.ts).
+// This is the preferred data source: small, edge-cached, and doesn't hit
+// NUSMods/GitHub from every visitor's browser. fetchVenueData() above remains
+// as a resilience fallback if this route is ever unavailable.
+export async function fetchCompactedSnapshot(): Promise<VenueMatrix> {
+  const res = await fetch("/api/venues", { cache: "no-store" });
+  if (!res.ok) throw new Error(`/api/venues HTTP ${res.status}`);
+  return (await res.json()) as VenueMatrix;
+}
+
