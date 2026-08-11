@@ -41,7 +41,7 @@ A full browser-based QA pass was run against `https://nus-vacansee.vercel.app` (
 - [x] Legal/attribution (NUSMods MIT credit, OneMap/SLA credit, "not affiliated with NUS" disclaimer, Acknowledgements page)
 - [x] Usage analytics wired and enabled
 - [x] Full live QA pass completed (2026-07-07) — see findings above
-- [ ] **Decision needed:** launch now accepting the opening-hours/access gap (mitigated by "verify on site" caveats + crowd reports), or wait for organic crowd-report signal to partially cover it first
+- [x] **Decision made (2026-08-11):** launch now accepting the opening-hours/access gap. Lock-state awareness is out of scope — there is no reliable public source for it, and the "verify on site" caveats + crowd reports are the mitigation.
 - [ ] Optional: prepare where you'll announce (NUS Telegram groups, r/NationalUniversityofSingapore, class group chats, etc.) — worth planning alongside the tech readiness
 
 ---

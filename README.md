@@ -9,7 +9,7 @@
   <br/><br/>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-  ![No backend](https://img.shields.io/badge/architecture-no%20backend-brightgreen)
+  ![Serverless](https://img.shields.io/badge/architecture-Vercel%20serverless-brightgreen)
   ![PWA](https://img.shields.io/badge/install-PWA-blue)
   ![Made for NUS](https://img.shields.io/badge/made%20for-NUS%20students-orange)
 </div>
@@ -46,6 +46,7 @@ it is, roughly how many seats, and one-tap directions.
 |---|---|
 | **Available now, near you** | Auto-detects your location and lists currently vacant rooms ranked by distance + how long they stay free |
 | **Live status** | Vacant / occupied / busy, computed from the local clock, refreshed every 30 s |
+| **Crowd-sourced confirmations** | Report whether a room is actually free / occupied / locked (30-min relevance), so timetable-based status gets a real-world check |
 | **Map view** | Free-room pins on a OneMap basemap with NUS building names; tap a pin for details and directions |
 | **Directions** | Opens the room's exact location in Google Maps |
 | **Weekly timetable** | A NUSMods-style grid per venue with a "now" line |
@@ -55,29 +56,34 @@ it is, roughly how many seats, and one-tap directions.
 
 ## How it works
 
-NUS Vacansee is **fully client-side — there is no backend.**
+Availability is computed from published NUSMods class timetables. A small
+server-side pipeline keeps the data fresh without hammering NUSMods:
 
-1. The browser fetches NUS data directly:
-   - **Availability:** NUSMods `venueInformation.json` (per-semester class
-     schedules), and
-   - **Locations:** NUSMods `venues.json` (per-venue coordinates, room name, floor).
-2. It **normalizes** that into a venue → schedule matrix, infers room type and an
-   approximate capacity, and maps each venue to a faculty cluster.
-3. **Occupancy is computed in the browser** using Singapore local time against the
-   current semester + teaching week.
-4. Data is **cached** (IndexedDB, stale-while-revalidate ~12h) with a bundled
-   static snapshot as an offline fallback, and a service worker caches the app
-   shell.
+1. A **daily Vercel Cron** (`/api/cron/refresh-venues`) re-fetches + normalizes
+   NUSMods schedules (both semesters + special terms) and writes a compacted
+   snapshot to **Vercel Blob**.
+2. Visitors fetch that snapshot via an **edge-cached endpoint** (`/api/venues`),
+   so most visits are served by the CDN and never touch NUSMods. If it's ever
+   unavailable, the app falls back to fetching NUSMods/GitHub directly in the
+   browser, then to a bundled offline snapshot.
+3. **Occupancy is computed in the browser** using Singapore time against the
+   current semester + teaching week, so free rooms are ranked by distance and
+   how long they'll stay free.
+4. Data is **cached in IndexedDB** (stale-while-revalidate ~12h) and a service
+   worker caches the app shell for offline use.
+5. A **crowd-sourced "is this room actually free?"** layer lets users confirm or
+   correct a room's status (30-min relevance), bridging timetable-inferred
+   availability and reality.
 
-This keeps it zero-cost to run and respectful of the NUSMods API (data is fetched
-at most ~once per 12 hours and cached).
+It's cost-free to run (serverless functions + Blob storage) and respectful of
+NUSMods: the API is fetched at most ~once a day, server-side.
 
 ## Tech stack
 
 - **Next.js 16** (App Router, React 19), deployed on **Vercel**
 - **Tailwind CSS v4**, glassmorphic design with NUS corporate colors
 - **Leaflet / react-leaflet** with **OneMap** tiles for the map
-- TypeScript, no server / no database
+- TypeScript; a few serverless API routes + **Vercel Blob** for the data snapshot and crowd reports (occupancy math stays client-side)
 
 ## Getting started
 
@@ -87,24 +93,37 @@ npm run dev      # http://localhost:3000
 npm run build    # production build
 ```
 
-### Environment variables (optional)
+### Environment variables
 
-Copy `.env.example` to `.env.local` and set the feedback endpoint:
+Only the two public (client-visible) vars go in `.env.local` for local dev; the
+server-side vars are set **only in the Vercel dashboard** and never committed.
 
 ```bash
-# Create a free form at https://formspree.io (or Tally) and paste its POST URL
+# .env.local — local development only
 NEXT_PUBLIC_FEEDBACK_ENDPOINT=https://formspree.io/f/your-id
-# Optional fallback when no endpoint is set: opens the user's mail client
 NEXT_PUBLIC_FEEDBACK_EMAIL=you@example.com
 ```
 
-On Vercel, add the same variables under Project → Settings → Environment Variables.
+Server-side vars (Vercel dashboard → Settings → Environment Variables):
+- `BLOB_READ_WRITE_TOKEN` **or** `BLOB_STORE_ID` — Vercel Blob auth for the data
+  snapshot + crowd reports (needed for the pipeline and reports to work).
+- `CRON_SECRET` — Bearer token that authorizes the daily refresh cron.
 
 ## Feedback
 
 Use the **"Send feedback"** link in the app footer to report a wrong room status
 or suggest a feature. Submissions post to the configured form endpoint (or open
 your mail client as a fallback).
+
+## Privacy
+
+- **No accounts and no user database.** Everything is computed in your browser.
+- **Location** is used only to sort nearby rooms; it never leaves your device and
+  is never stored.
+- **Vercel Analytics** collects aggregate, anonymous usage statistics (page views,
+  approximate region) to help improve the app. It contains no personal data.
+- **Feedback / crowd reports** store only what you submit (a room code + status),
+  with no identity attached.
 
 ## Data sources & Acknowledgements
 
@@ -123,7 +142,8 @@ Room availability and venue locations come from [NUSMods](https://nusmods.com):
   package** (MIT), so week numbering matches NUSMods exactly.
 
 NUSMods provides a public API and asks that it be used responsibly — this app
-fetches at most once per ~12h, caches client-side, and ships a static fallback.
+fetches it at most ~once a day, server-side, and serves an edge-cached snapshot
+(with a bundled static fallback).
 NUSMods and its `nusmoderator` package are distributed under the MIT License:
 
 ```
