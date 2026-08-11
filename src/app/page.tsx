@@ -32,6 +32,17 @@ const MapView = dynamic(() => import("@/components/MapView"), {
 const NEAR_ME_LIMIT = 60;
 const MAP_PIN_LIMIT = 200;
 
+// Plan-ahead date helpers. The app's Date objects are built so their local
+// getters read as Singapore time (getSingaporeTime() parses an SG-formatted
+// string), so a local ISO date is the SG calendar date.
+const isoLocalDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
 export default function Home() {
   const { venues, loading, error, refreshing, lastUpdated, refresh } =
     useVenueData();
@@ -159,6 +170,16 @@ export default function Home() {
   const planInputValue = planTime
     ? `${String(planTime.getHours()).padStart(2, "0")}:${String(planTime.getMinutes()).padStart(2, "0")}`
     : "";
+  // Date half of the plan reference: the plan's own date, defaulting to today
+  // so typing just a time still means today (the original behavior).
+  const todayISO = isoLocalDate(now);
+  const planDateValue = planTime ? isoLocalDate(planTime) : todayISO;
+  // Compact date suffix for plan labels, e.g. "· Thu 7 Aug" — shown whenever
+  // the plan date isn't today so the reference is unambiguous.
+  const planDateLabel =
+    planTime && isoLocalDate(planTime) !== todayISO
+      ? ` · ${DAYS_SHORT[planTime.getDay()]} ${planTime.getDate()} ${MONTHS_SHORT[planTime.getMonth()]}`
+      : "";
   const setPlanFromInput = (value: string) => {
     if (!value) {
       setPlanTime(null);
@@ -166,9 +187,19 @@ export default function Home() {
     }
     const [h, m] = value.split(":").map(Number);
     if (Number.isNaN(h) || Number.isNaN(m)) return;
-    const t = new Date(now);
-    t.setHours(h, m, 0, 0);
-    setPlanTime(t);
+    // Keep the date the picker is currently showing (plan date, else today).
+    const [y, mo, d] = planDateValue.split("-").map(Number);
+    setPlanTime(new Date(y, mo - 1, d, h, m, 0, 0));
+  };
+  const setPlanFromDate = (value: string) => {
+    if (!value) return; // empty date → leave the current reference alone
+    const [y, mo, d] = value.split("-").map(Number);
+    if (Number.isNaN(y) || Number.isNaN(mo) || Number.isNaN(d)) return;
+    // Keep the currently selected time, defaulting to the live clock's time
+    // when no plan is set yet.
+    const h = planTime ? planTime.getHours() : now.getHours();
+    const m = planTime ? planTime.getMinutes() : now.getMinutes();
+    setPlanTime(new Date(y, mo - 1, d, h, m, 0, 0));
   };
   const headerLabelFull = useMemo(() => getHeaderPeriodLabel(now, false), [now]);
   const inTeachingWeek = useMemo(() => getCurrentWeek(now) > 0, [now]);
@@ -449,6 +480,13 @@ export default function Home() {
                 </button>
               </div>
               <input
+                type="date"
+                aria-label="Check availability on a specific date"
+                value={planDateValue}
+                onChange={(e) => setPlanFromDate(e.target.value)}
+                className="rounded-lg border border-zinc-200 bg-white/60 px-2.5 py-1 font-mono text-xs text-zinc-700 outline-none transition-colors focus:border-nus-blue focus:ring-2 focus:ring-nus-blue/20"
+              />
+              <input
                 type="time"
                 aria-label="Check availability at a specific time"
                 value={planInputValue}
@@ -457,7 +495,10 @@ export default function Home() {
               />
               {planTime && (
                 <span className="inline-flex items-center gap-1.5 text-xs text-nus-blue">
-                  <span className="font-medium">at {formatTime(planHHMM)}</span>
+                  <span className="font-medium">at {formatTime(planHHMM)}{planDateLabel}</span>
+                  {planTime.getTime() < now.getTime() && (
+                    <span className="text-zinc-400">(past)</span>
+                  )}
                   <button
                     onClick={() => setPlanTime(null)}
                     className="font-medium underline underline-offset-2 hover:text-nus-blue/80"
@@ -546,7 +587,7 @@ export default function Home() {
                   <div className="mb-3 flex items-end justify-between gap-2">
                     <div>
                       <h2 className="font-display text-xl font-bold tracking-[-0.02em] text-zinc-800">
-                        {planTime ? `Free at ${formatTime(planHHMM)} near you` : "Available now near you"}
+                        {planTime ? `Free at ${formatTime(planHHMM)}${planDateLabel} near you` : "Available now near you"}
                       </h2>
                       <p className="text-xs text-zinc-500">
                         {detectedCluster
